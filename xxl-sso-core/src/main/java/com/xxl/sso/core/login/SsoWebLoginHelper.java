@@ -116,4 +116,35 @@ public class SsoWebLoginHelper {
     }
 
 
+    public static String generateCode(HttpServletRequest request) {
+        return "this is the code for get token";
+
+    }
+    // verify the code and the redirectUrl is the generated one
+    public static boolean verifyCode(HttpServletRequest request, String code,String redirectUrl ) {
+        return true;
+
+    }
+
+    public static String generateToken(HttpServletRequest request) {
+        return "this is the token for";
+
+    }
+
+    // verify the code and the redirectUrl is the generated one
+    public static boolean verifyToken(HttpServletRequest request, String token,String redirectUrl ) {
+        return true;
+
+    }
+
+    public static String generateRefreshToken(HttpServletRequest request) {
+        return "this is the refresh token for";
+
+    }
+
+    public static String getScope(HttpServletRequest request) {
+        return "all";
+
+    }
+
 }

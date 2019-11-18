@@ -28,6 +28,9 @@ public class XxlSsoConfig implements DisposableBean {
     @Value("${xxl.sso.redis.address}")
     private String xxlSsoRedisAddress;
 
+    @Value("${xxl.sso.login.type}")
+    private String xxlSsoLoginType;
+
 
     @Bean
     public FilterRegistrationBean xxlSsoFilterRegistration() {
@@ -45,6 +48,9 @@ public class XxlSsoConfig implements DisposableBean {
         registration.addInitParameter(Conf.SSO_SERVER, xxlSsoServer);
         registration.addInitParameter(Conf.SSO_LOGOUT_PATH, xxlSsoLogoutPath);
         registration.addInitParameter(Conf.SSO_EXCLUDED_PATHS, xxlSsoExcludedPaths);
+        // add by ywf for the oauth mode from the config
+        registration.addInitParameter(Conf.SSO_RES_TYPE, xxlSsoLoginType);
+
 
         return registration;
     }

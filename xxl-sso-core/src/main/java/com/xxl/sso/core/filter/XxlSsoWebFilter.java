@@ -26,6 +26,8 @@ public class XxlSsoWebFilter extends HttpServlet implements Filter {
     private String ssoServer;
     private String logoutPath;
     private String excludedPaths;
+    //
+    private String grantType;
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -33,6 +35,8 @@ public class XxlSsoWebFilter extends HttpServlet implements Filter {
         ssoServer = filterConfig.getInitParameter(Conf.SSO_SERVER);
         logoutPath = filterConfig.getInitParameter(Conf.SSO_LOGOUT_PATH);
         excludedPaths = filterConfig.getInitParameter(Conf.SSO_EXCLUDED_PATHS);
+        // get the login type
+        grantType = filterConfig.getInitParameter(Conf.SSO_RES_TYPE);
 
         logger.info("XxlSsoWebFilter init.");
     }
@@ -77,6 +81,10 @@ public class XxlSsoWebFilter extends HttpServlet implements Filter {
 
         // valid login user, cookie + redirect
         XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(req, res);
+        // total link
+        String link = req.getRequestURL().toString();
+        String loginPageUrl="/";
+        boolean bConfToken = Conf.SSO_CODE.equals(grantType);
 
         // valid login fail
         if (xxlUser == null) {
@@ -90,18 +98,52 @@ public class XxlSsoWebFilter extends HttpServlet implements Filter {
                 res.getWriter().println("{\"code\":"+Conf.SSO_LOGIN_FAIL_RESULT.getCode()+", \"msg\":\""+ Conf.SSO_LOGIN_FAIL_RESULT.getMsg() +"\"}");
                 return;
             } else {
-
-                // total link
-                String link = req.getRequestURL().toString();
-
-                // redirect logout
-                String loginPageUrl = ssoServer.concat(Conf.SSO_LOGIN)
-                        + "?" + Conf.REDIRECT_URL + "=" + link;
-
+                if(bConfToken){
+                    // not login , and configurated code mode, should be granted
+                    request.setAttribute(Conf.SSO_RES_TYPE, Conf.SSO_GRANT_REQUEST);
+                    loginPageUrl = ssoServer.concat(Conf.SSO_GRANT)
+                                    + "?" + Conf.REDIRECT_URL + "=" + link;
+                }else {
+                    // grand type is namepassword type,
+                    loginPageUrl = ssoServer.concat(Conf.SSO_LOGIN)
+                            + "?" + Conf.REDIRECT_URL + "=" + link;
+                }
                 res.sendRedirect(loginPageUrl);
                 return;
             }
 
+        }
+
+        // valid login sucess
+        if(bConfToken) {
+            String token = req.getHeader(Conf.SSO_ACCESS_TOKEN);
+            token = req.getParameter(Conf.SSO_ACCESS_TOKEN);
+            if (token != null) {
+                // get access token
+                loginPageUrl = ssoServer.concat(Conf.SSO_URI_CHECK_TOKEN)
+                        + "?" + Conf.REDIRECT_URL + "=" + link
+                        + "&" + Conf.SSO_ACCESS_TOKEN + "=" + token;
+                res.sendRedirect(loginPageUrl);
+                return;
+            } else {
+                // get code
+                String rescode = req.getParameter(Conf.SSO_CODE);
+                if (rescode != null) {
+                    // get accestoken
+                    String client_id = req.getParameter(Conf.SSO_CLIENT_ID);
+                    String scope = request.getParameter(Conf.SSO_SCOPE);
+                    String state = request.getParameter(Conf.SSO_STATE);
+                    loginPageUrl = ssoServer.concat(Conf.SSO_URI_TOKEN)
+                            + "?" + Conf.REDIRECT_URL + "=" + link
+                            + "&" + Conf.SSO_GRANT_TYPE + "=" + Conf.SSO_GRANT_REQUEST
+                            + "&" + Conf.SSO_CLIENT_ID + "=" + client_id
+                            + "&" + Conf.SSO_CODE + "=" + rescode
+                            + "&" + Conf.SSO_STATE + "=" + state;
+                    res.sendRedirect(loginPageUrl);
+                    return;
+                }
+
+            }
         }
 
         // ser sso user

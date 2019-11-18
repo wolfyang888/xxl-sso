@@ -36,7 +36,15 @@ public class WebController {
         XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(request, response);
 
         if (xxlUser == null) {
-            return "redirect:/login";
+            String requestType = request.getParameter(Conf.SSO_RES_TYPE);
+            if(Conf.SSO_CODE.equals(requestType)){
+                // the Authentication-code mode
+                return "redirect:/grant";
+
+            }else {
+                // the name password mode
+                return "redirect:/login";
+            }
         } else {
             model.addAttribute("xxlUser", xxlUser);
             return "index";
@@ -148,4 +156,169 @@ public class WebController {
     }
 
 
-}
+    /**
+     * Login page
+     *
+     * @param model
+     * @param request
+     * @return
+     */
+    @RequestMapping(Conf.SSO_GRANT)
+    public String grant(Model model, HttpServletRequest request, HttpServletResponse response) {
+
+        // login check
+        XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(request, response);
+
+        if (xxlUser == null) {
+            return "redirect:/login";
+        }
+
+        model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+        model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+        return "grant";
+    }
+
+    @RequestMapping("/doGrant")
+    public String doGrant(Model model,
+                          HttpServletRequest request,
+                          HttpServletResponse response,
+                          RedirectAttributes redirectAttributes,
+                          String agree
+                          ){
+
+        // login check
+        XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(request, response);
+        if( xxlUser == null){
+            model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+            model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+            return "redirect:/login";
+        }
+
+        // get the client_id
+
+        String client_id = request.getParameter(Conf.SSO_CLIENT_ID);
+        if("".equals(client_id) || null == client_id){
+//            client_id = xxlUser.getUserid();
+            client_id = xxlUser.getUsername();
+
+        }
+//        String requestType = (String)request.getAttribute(Conf.SSO_RES_TYPE);
+        String requestType = Conf.SSO_GRANT_REQUEST;
+        boolean bAgree = (agree!=null && "on".equals(agree))?true:false;
+        String scope = request.getParameter(Conf.SSO_SCOPE);
+        String state = request.getParameter(Conf.SSO_STATE);
+
+        if (xxlUser.getUsername().equals(client_id))
+        {
+            if( Conf.SSO_GRANT_REQUEST.equals(requestType) && bAgree ){
+                String code = SsoWebLoginHelper.generateCode(request);
+                String sessionId = SsoWebLoginHelper.getSessionIdByCookie(request);
+                String redirectUrl = request.getParameter(Conf.REDIRECT_URL);
+                String redirectUrlFinal = redirectUrl + "?" + Conf.SSO_CODE + "=" + code
+                                                      + "&" + Conf.SSO_STATE + "=" + state
+                                                      + "&" + Conf.SSO_SESSIONID + "=" + sessionId;
+                return "redirect:" + redirectUrlFinal;
+            }else{
+                return "redirect:/";
+            }
+
+        }
+        return "redirect:/";
+
+    }
+
+    @RequestMapping(Conf.SSO_URI_TOKEN)
+    public String getToken(Model model, HttpServletRequest request, HttpServletResponse response){
+
+        // login check
+        XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(request, response);
+        if( xxlUser == null){
+            model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+            model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+            return "redirect:/login";
+        }
+
+        String client_id = request.getParameter(Conf.SSO_CLIENT_ID);
+        if("".equals(client_id) || null == client_id){
+//            client_id = xxlUser.getUserid();
+            client_id = xxlUser.getUsername();
+
+        }
+        String grantType = request.getParameter(Conf.SSO_GRANT_TYPE);
+        String code = request.getParameter(Conf.SSO_CODE);
+        String redirectUrl = request.getParameter(Conf.REDIRECT_URL);
+
+        if (xxlUser != null) {
+
+            // success redirect
+            if (redirectUrl!=null && redirectUrl.trim().length()>0) {
+
+                if( SsoWebLoginHelper.verifyCode(request,code, redirectUrl) ){
+                    String scope = SsoWebLoginHelper.getScope(request);
+                    String token = SsoWebLoginHelper.generateToken(request);
+                    String refresh_token = SsoWebLoginHelper.generateRefreshToken(request);
+                    String redirectUrlFinal = redirectUrl+"?"+Conf.SSO_ACCESS_TOKEN+ "=" + token;
+                    response.setHeader(Conf.SSO_ACCESS_TOKEN,token);
+                    response.setHeader(Conf.SSO_TOKEN_TYPE,Conf.SSO_BEARER_TOKEN_TYPE);
+                    response.setHeader(Conf.SSO_REFRESH_TOKEN,refresh_token);
+                    response.setIntHeader(Conf.SSO_EXPIRES_IN,Conf.SSO_EXPIRES_IN_TIME);
+
+                    return "redirect:" + redirectUrlFinal;
+                }else {
+                    return "redirect:/";
+                }
+
+            } else {
+                return "redirect:/";
+            }
+        }
+
+        model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+        model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+        return "login";
+    }
+
+    @RequestMapping(Conf.SSO_URI_CHECK_TOKEN)
+    public String checkToken(Model model, HttpServletRequest request, HttpServletResponse response){
+        // login check
+        XxlSsoUser xxlUser = SsoWebLoginHelper.loginCheck(request, response);
+        if( xxlUser == null){
+            model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+            model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+            return "redirect:/login";
+        }
+
+        String client_id = request.getParameter(Conf.SSO_CLIENT_ID);
+        if("".equals(client_id) || null == client_id){
+//            client_id = xxlUser.getUserid();
+            client_id = xxlUser.getUsername();
+
+        }
+        String token = request.getParameter(Conf.SSO_ACCESS_TOKEN);
+        String redirectUrl = request.getParameter(Conf.REDIRECT_URL);
+
+        if (xxlUser != null) {
+
+            // success redirect
+            if (redirectUrl!=null && redirectUrl.trim().length()>0) {
+
+                if( SsoWebLoginHelper.verifyToken(request,token, redirectUrl) ){
+                    String redirectUrlFinal = redirectUrl;
+                    return "redirect:" + redirectUrlFinal;
+                }else {
+                    return "redirect:/";
+                }
+
+            } else {
+                return "redirect:/";
+            }
+        }
+
+        model.addAttribute("errorMsg", request.getParameter("errorMsg"));
+        model.addAttribute(Conf.REDIRECT_URL, request.getParameter(Conf.REDIRECT_URL));
+        return "login";
+
+    }
+
+
+    }
